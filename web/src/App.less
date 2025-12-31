@@ -1,0 +1,115 @@
+// 定义一些颜色变量，方便以后改主题
+@primary-color: #007bff;
+@bg-color: #f5f7fa;
+@user-bubble: #007bff;
+@ai-bubble: #ffffff;
+
+// 这是一个 Reset，把默认的边距去掉
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+// 整个页面容器
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh; // 占满屏幕高度
+  background-color: @bg-color;
+  font-family: 'PingFang SC', sans-serif;
+
+  .header {
+    background: white;
+    padding: 15px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    text-align: center;
+    h1 {
+      font-size: 1.2rem;
+      color: #333;
+    }
+  }
+
+  .message-list {
+    flex: 1; // 占满剩余空间
+    padding: 20px;
+    overflow-y: auto; // 内容多了可以滚动
+
+    .message {
+      display: flex;
+      margin-bottom: 20px;
+      align-items: flex-start;
+
+      .avatar {
+        font-size: 1.5rem;
+        margin: 0 10px;
+      }
+
+      .bubble {
+        padding: 10px 15px;
+        border-radius: 10px;
+        max-width: 70%;
+        line-height: 1.5;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+      }
+
+      // 用户的消息样式（靠右）
+      &.user {
+        flex-direction: row-reverse; // 这一行让它反过来排列
+        .bubble {
+          background-color: @user-bubble;
+          color: white;
+          border-top-right-radius: 0;
+        }
+      }
+
+      // AI 的消息样式（靠左）
+      &.ai {
+        .bubble {
+          background-color: @ai-bubble;
+          color: #333;
+          border-top-left-radius: 0;
+        }
+      }
+    }
+
+    .loading {
+      text-align: center;
+      color: #999;
+      font-size: 0.9rem;
+    }
+  }
+
+  .input-area {
+    background: white;
+    padding: 15px;
+    display: flex;
+    gap: 10px; // 按钮和输入框的间距
+
+    input {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 20px;
+      outline: none;
+      &:focus {
+        border-color: @primary-color;
+      }
+    }
+
+    button {
+      padding: 10px 20px;
+      background-color: @primary-color;
+      color: white;
+      border: none;
+      border-radius: 20px;
+      cursor: pointer;
+      &:disabled {
+        background-color: #ccc;
+      }
+      &:hover:not(:disabled) {
+        background-color: darken(@primary-color, 10%);
+      }
+    }
+  }
+}
