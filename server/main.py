@@ -12,7 +12,7 @@ from rag_core import RAGService  # 引用刚才写的逻辑
 
 # ➕ 新增：引入数据库相关
 from sqlalchemy.orm import Session
-from db import get_db, ChatHistory
+from db import get_db, ChatHistory , Feedback
 
 # ➕ 新增 UploadFile 和 File，用来处理文件上传
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
@@ -100,6 +100,28 @@ async def chat(req: ChatRequest, db: Session = Depends(get_db)): # 注入数据�
     db.commit() # 提交保存
     
     return result
+
+
+# 1. 定义接收的数据格式 (DTO)
+class FeedbackRequest(BaseModel):
+    msg_id: str
+    score: int
+
+# 2. 新增接口
+@app.post("/feedback")
+async def save_feedback(req: FeedbackRequest, db: Session = Depends(get_db)):
+    # 🔍 【追踪点 1】: 打印看看有没有收到前端的数据
+    print(f"📡 [后端收到数据] msg_id={req.msg_id}, score={req.score}")
+    
+    # 3. 写入数据库
+    new_feedback = Feedback(msg_id=req.msg_id, score=req.score)
+    db.add(new_feedback)
+    db.commit()
+    
+    # 🔍 【追踪点 2】: 确认已存入
+    print("✅ [数据库] 写入成功！")
+    
+    return {"status": "ok", "message": "感谢您的反馈"}
 
 if __name__ == "__main__":
     import uvicorn

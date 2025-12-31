@@ -90,12 +90,38 @@ function App() {
     }
   };
 
+  // ➕ 新增：点赞函数
+  const handleLike = async () => {
+    const testMsgId = "msg_" + Date.now(); // 模拟一个 ID
+    
+    // 🔍 【追踪点 0】: 前端准备发数据
+    console.log(`🚀 [前端发送] 正在给 ID: ${testMsgId} 点赞...`);
+
+    try {
+      await axios.post('http://127.0.0.1:8000/feedback', {
+        msg_id: testMsgId,
+        score: 1
+      });
+      alert("👍 点赞成功！已存入数据库");
+    } catch (error) {
+      console.error(error);
+      alert("❌ 失败");
+    }
+  };
+
   // --- 下面是界面画图 (TSX) ---
   return (
     <div className="chat-container">
       <header className="header">
         <h1>🤖 企业知识库助手</h1>
       </header>
+
+      {/* ➕ 在中间找个显眼的地方加这个按钮，比如 Header 下面 */}
+      <div style={{ textAlign: 'center', padding: '10px' }}>
+        <button onClick={handleLike} style={{ background: '#ff9800' }}>
+          👍 测试点赞功能 (数据追踪 Demo)
+        </button>
+      </div>
       
       {/* 聊天记录列表区域 */}
       <div className="message-list">

@@ -40,6 +40,15 @@ class ChatHistory(Base):
     content = Column(Text)     # 聊天内容
     create_time = Column(DateTime, default=datetime.now)
 
+# ➕ 新增：反馈表
+class Feedback(Base):
+    __tablename__ = "feedback_log"
+
+    id = Column(Integer, primary_key=True, index=True)
+    msg_id = Column(String(50)) # 关联哪条消息
+    score = Column(Integer)     # 1代表赞，-1代表踩
+    create_time = Column(DateTime, default=datetime.now)
+
 # 6. 自动建表 (如果表不存在，这行代码会帮你在数据库建表，双重保险)
 Base.metadata.create_all(bind=engine)
 
