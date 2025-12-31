@@ -5,6 +5,8 @@ from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 import os
 from dotenv import load_dotenv
+# 🔴 修改引入：不再用通用的 DateTime，而是用 MySQL 专用的
+from sqlalchemy.dialects.mysql import DATETIME
 
 # 1. 加载环境变量 (最好把数据库密码放在 .env 里，这里为了教学方便先写死或读取)
 load_dotenv()
@@ -38,7 +40,9 @@ class ChatHistory(Base):
     session_id = Column(String(50), default="default") # 暂时默认 default
     role = Column(String(10))  # user 或 ai
     content = Column(Text)     # 聊天内容
-    create_time = Column(DateTime, default=datetime.now)
+    # create_time = Column(DateTime, default=datetime.now)
+    # fsp=6 代表保留 6 位小数 (微秒)
+    create_time = Column(DATETIME(fsp=6), default=datetime.now)
 
 # ➕ 新增：反馈表
 class Feedback(Base):

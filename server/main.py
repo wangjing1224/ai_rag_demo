@@ -157,7 +157,7 @@ async def get_history(db: Session = Depends(get_db)):
     # order_by(desc): 按时间倒序查（最新的在前面）
     # limit(20): 只拿最近 20 条
     messages = db.query(ChatHistory)\
-        .order_by(ChatHistory.id.desc())\
+        .order_by(ChatHistory.create_time.desc())\
         .limit(20)\
         .all()
     
