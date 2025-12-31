@@ -50,14 +50,34 @@ class RAGService:
         
         print(f"✅ PDF '{file_path}' 已成功加入知识库！")
 
-    def chat(self, question: str):
-        if not self.vector_store:
-            return {"answer": "知识库为空，请先上传文件！", "context": ""}
+    # def chat(self, question: str):
+    #     if not self.vector_store:
+    #         return {"answer": "知识库为空，请先上传文件！", "context": ""}
             
+    #     docs = self.vector_store.similarity_search(question, k=2)
+    #     context = "\n".join([d.page_content for d in docs])
+        
+    #     prompt = f"已知信息：\n{context}\n\n用户问题：{question}\n请根据已知信息回答。"
+    #     response = self.llm.invoke(prompt).content
+        
+    #     return {"answer": response, "context": context}
+    
+    # 🔴 也就是把原来的 chat 方法改造成下面这样
+    def chat_stream(self, question: str):
+        if not self.vector_store:
+            yield "知识库为空，请先上传文件！"
+            return
+            
+        # 1. 检索 (和以前一样)
         docs = self.vector_store.similarity_search(question, k=2)
         context = "\n".join([d.page_content for d in docs])
         
         prompt = f"已知信息：\n{context}\n\n用户问题：{question}\n请根据已知信息回答。"
-        response = self.llm.invoke(prompt).content
         
-        return {"answer": response, "context": context}
+        # 2. 调用 LLM (开启流式模式!)
+        # 注意：这里我们直接循环 llm.stream，而不是 invoke
+        for chunk in self.llm.stream(prompt):
+            content = chunk.content
+            if content:
+                # yield 就像是“挤牙膏”，挤一点出来给外面
+                yield content

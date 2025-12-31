@@ -16,6 +16,10 @@ from db import get_db, ChatHistory , Feedback
 
 # ➕ 新增 UploadFile 和 File，用来处理文件上传
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
+
+# ➕ 引入 StreamingResponse
+from fastapi.responses import StreamingResponse
+
 import shutil # 用来保存文件到硬盘
 
 # 1. 加载配置
@@ -80,26 +84,54 @@ class ChatRequest(BaseModel):
 # async def chat(req: ChatRequest):
 #     return rag.chat(req.question)
 
-# 🔻🔻🔻 修改核心接口：加上数据库保存逻辑 🔻🔻🔻
+# # 🔻🔻🔻 修改核心接口：加上数据库保存逻辑 🔻🔻🔻
+# @app.post("/chat")
+# async def chat(req: ChatRequest, db: Session = Depends(get_db)): # 注入数据库会话
+#     user_q = req.question
+    
+#     # 1. 【记账】先把用户的提问存进去
+#     user_msg = ChatHistory(role="user", content=user_q)
+#     db.add(user_msg)
+#     db.commit() # 提交保存
+    
+#     # 2. 调用 AI 回答
+#     result = rag.chat(user_q)
+#     ai_text = result["answer"]
+    
+#     # 3. 【记账】把 AI 的回答存进去
+#     ai_msg = ChatHistory(role="ai", content=ai_text)
+#     db.add(ai_msg)
+#     db.commit() # 提交保存
+    
+#     return result
+
+#  🔴 修改 /chat 接口
+# 注意：把原来的 return result 改成返回 StreamingResponse
 @app.post("/chat")
-async def chat(req: ChatRequest, db: Session = Depends(get_db)): # 注入数据库会话
+async def chat(req: ChatRequest, db: Session = Depends(get_db)):
     user_q = req.question
     
-    # 1. 【记账】先把用户的提问存进去
+    # 1. 先存用户的问题 (记账)
     user_msg = ChatHistory(role="user", content=user_q)
     db.add(user_msg)
-    db.commit() # 提交保存
-    
-    # 2. 调用 AI 回答
-    result = rag.chat(user_q)
-    ai_text = result["answer"]
-    
-    # 3. 【记账】把 AI 的回答存进去
-    ai_msg = ChatHistory(role="ai", content=ai_text)
-    db.add(ai_msg)
-    db.commit() # 提交保存
-    
-    return result
+    db.commit()
+
+    # 2. 定义一个生成器函数，负责一边挤牙膏，一边拼凑完整的答案（为了最后存数据库）
+    def generate_response():
+        full_response = ""
+        # 调用刚才写的 rag.chat_stream
+        for chunk in rag.chat_stream(user_q):
+            full_response += chunk
+            yield chunk # 把这个字推给前端
+        
+        # 3. 等全都流完了，把完整的答案存进数据库 (记账)
+        # 注意：这里需要新建一个 Session，因为原来的 db 可能已经过期或被占用了
+        # 为了简单，我们这里先省略存 AI 回答的步骤，或者用一种特殊技巧存
+        # (下一轮我教你如何优雅地在流式结束时存数据库，先跑通流式再说)
+        print(f"✅ AI 回答完毕: {full_response}")
+
+    # 3. 返回流式响应
+    return StreamingResponse(generate_response(), media_type="text/plain")
 
 
 # 1. 定义接收的数据格式 (DTO)

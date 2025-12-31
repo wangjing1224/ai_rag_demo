@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'; // 引入“记忆”功能
-import axios from 'axios';        // 引入“打电话”功能
+// import axios from 'axios';        // 引入“打电话”功能
 import './App.less';              // 引入“装修图纸”
 import { chatApi } from './api';
 
@@ -57,43 +57,79 @@ function App() {
     }
   };
 
-  // --- 发送消息的核心函数 ---
+  // // --- 发送消息的核心函数 ---
+  // const sendMessage = async () => {
+  //   // 1. 如果没输入内容，就不发送 (trim 去掉前后空格)
+  //   if (!input.trim()) return;
+
+  //   // 2. 把用户说的话先“上屏”
+  //   // ...messages 表示把旧记录展开，后面加上新的一条
+  //   const newMessages = [...messages, { role: 'user', content: input } as Message];
+  //   setMessages(newMessages);
+
+  //   // 3. 清空输入框，并开启“加载中”状态
+  //   setInput('');
+  //   setLoading(true);
+
+  //   try {
+  //     // 【原理：HTTP 请求】
+  //     // 用 axios 给咱们的 Python 后端 (8000端口) 打个电话
+  //     // await 表示“在这里等一下”，直到后端回复了再往下走
+  //     // const res = await axios.post('http://127.0.0.1:8000/chat', {
+  //     //   question: input  // 对应 Python 里的 ChatRequest
+  //     // });
+
+  //     const data = await chatApi.sendMessage(input); // 使用封装好的 API 方法
+
+  //     // 4. 收到回复后，把 AI 的话也“上屏”
+  //     // res.data.answer 就是 Python 返回的那个 answer 字段
+  //     // setMessages([...newMessages, { role: 'ai', content: res.data.answer }]);
+
+  //     setMessages([...newMessages, { role: 'ai', content: data.answer }]);
+
+  //   } catch (e) {
+  //     // console.error(error);
+  //     // alert('连接后端失败！请检查 Python 黑窗口是不是关了？');
+  //     console.error("前端解析错了:", e); // 建议把错误打印出来，以后好排查
+  //     alert("出错了：" + e);
+  //   } finally {
+  //     // 无论成功失败，最后都要把“思考中”关掉
+  //     setLoading(false);
+  //   }
+  // };
+
   const sendMessage = async () => {
-    // 1. 如果没输入内容，就不发送 (trim 去掉前后空格)
     if (!input.trim()) return;
 
-    // 2. 把用户说的话先“上屏”
-    // ...messages 表示把旧记录展开，后面加上新的一条
-    const newMessages = [...messages, { role: 'user', content: input } as Message];
-    setMessages(newMessages);
-
-    // 3. 清空输入框，并开启“加载中”状态
+    // 1. 先把用户的话显示出来
+    const userMsg :Message= { role: 'user', content: input };
+    setMessages(prev => [...prev, userMsg]);
     setInput('');
     setLoading(true);
 
+    // 2. 先放一个空的 AI 消息占位 (准备接收数据)
+    setMessages(prev => [...prev, { role: 'ai', content: '' }]);
+
     try {
-      // 【原理：HTTP 请求】
-      // 用 axios 给咱们的 Python 后端 (8000端口) 打个电话
-      // await 表示“在这里等一下”，直到后端回复了再往下走
-      // const res = await axios.post('http://127.0.0.1:8000/chat', {
-      //   question: input  // 对应 Python 里的 ChatRequest
-      // });
+      // 3. 调用流式接口
+      let fullText = ""; // 用来拼凑完整的句子
 
-      const data = await chatApi.sendMessage(input); // 使用封装好的 API 方法
+      await chatApi.chatStream(input, (chunk) => {
+        fullText += chunk;
 
-      // 4. 收到回复后，把 AI 的话也“上屏”
-      // res.data.answer 就是 Python 返回的那个 answer 字段
-      // setMessages([...newMessages, { role: 'ai', content: res.data.answer }]);
+        // 4. 实时更新最后一条消息 (AI 的消息)
+        setMessages(prev => {
+          const newMessages = [...prev];
+          const lastMsg = newMessages[newMessages.length - 1];
+          lastMsg.content = fullText; // 更新内容
+          return newMessages;
+        });
+      });
 
-      setMessages([...newMessages, { role: 'ai', content: data.answer }]);
-
-    } catch (e) {
-      // console.error(error);
-      // alert('连接后端失败！请检查 Python 黑窗口是不是关了？');
-      console.error("前端解析错了:", e); // 建议把错误打印出来，以后好排查
-      alert("出错了：" + e);
+    } catch (error) {
+      console.error(error);
+      alert("生成失败");
     } finally {
-      // 无论成功失败，最后都要把“思考中”关掉
       setLoading(false);
     }
   };
