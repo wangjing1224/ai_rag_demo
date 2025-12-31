@@ -1,6 +1,7 @@
-import { useState,useRef } from 'react'; // 引入“记忆”功能
+import { useState, useRef } from 'react'; // 引入“记忆”功能
 import axios from 'axios';        // 引入“打电话”功能
 import './App.less';              // 引入“装修图纸”
+import { chatApi } from './api';
 
 // 【语法点：Interface】
 // 定义一条聊天记录必须长什么样。
@@ -13,11 +14,11 @@ interface Message {
 function App() {
   // 【语法点：useState】
   // input: 存用户正在输入框里敲的字
-  const [input, setInput] = useState(""); 
-  
+  const [input, setInput] = useState("");
+
   // messages: 存所有的聊天记录，是一个 Message 类型的数组
   const [messages, setMessages] = useState<Message[]>([]);
-  
+
   // loading: 标记是否正在等待 AI 回复（用来显示“思考中...”）
   const [loading, setLoading] = useState(false);
 
@@ -36,11 +37,12 @@ function App() {
     setLoading(true);
     try {
       // B. 发送到后端
-      await axios.post('http://127.0.0.1:8000/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data', // 告诉后端这是文件
-        },
-      });
+      // await axios.post('http://127.0.0.1:8000/upload', formData, {
+      //   headers: {
+      //     'Content-Type': 'multipart/form-data', // 告诉后端这是文件
+      //   },
+      // });
+      await chatApi.uploadFile(file); // 使用封装好的 API 方法
       // C. 提示成功 (这里简单用 alert，实际可以用 Toast)
       alert('📚 知识库学习完成！你可以问我关于这个文档的问题了。');
       // 这里的逻辑可以优化，比如发一条系统消息到聊天框
@@ -64,7 +66,7 @@ function App() {
     // ...messages 表示把旧记录展开，后面加上新的一条
     const newMessages = [...messages, { role: 'user', content: input } as Message];
     setMessages(newMessages);
-    
+
     // 3. 清空输入框，并开启“加载中”状态
     setInput('');
     setLoading(true);
@@ -73,17 +75,23 @@ function App() {
       // 【原理：HTTP 请求】
       // 用 axios 给咱们的 Python 后端 (8000端口) 打个电话
       // await 表示“在这里等一下”，直到后端回复了再往下走
-      const res = await axios.post('http://127.0.0.1:8000/chat', {
-        question: input  // 对应 Python 里的 ChatRequest
-      });
+      // const res = await axios.post('http://127.0.0.1:8000/chat', {
+      //   question: input  // 对应 Python 里的 ChatRequest
+      // });
+
+      const data = await chatApi.sendMessage(input); // 使用封装好的 API 方法
 
       // 4. 收到回复后，把 AI 的话也“上屏”
       // res.data.answer 就是 Python 返回的那个 answer 字段
-      setMessages([...newMessages, { role: 'ai', content: res.data.answer }]);
-      
-    } catch (error) {
-      console.error(error);
-      alert('连接后端失败！请检查 Python 黑窗口是不是关了？');
+      // setMessages([...newMessages, { role: 'ai', content: res.data.answer }]);
+
+      setMessages([...newMessages, { role: 'ai', content: data.answer }]);
+
+    } catch (e) {
+      // console.error(error);
+      // alert('连接后端失败！请检查 Python 黑窗口是不是关了？');
+      console.error("前端解析错了:", e); // 建议把错误打印出来，以后好排查
+      alert("出错了：" + e);
     } finally {
       // 无论成功失败，最后都要把“思考中”关掉
       setLoading(false);
@@ -93,15 +101,20 @@ function App() {
   // ➕ 新增：点赞函数
   const handleLike = async () => {
     const testMsgId = "msg_" + Date.now(); // 模拟一个 ID
-    
+
     // 🔍 【追踪点 0】: 前端准备发数据
     console.log(`🚀 [前端发送] 正在给 ID: ${testMsgId} 点赞...`);
 
     try {
-      await axios.post('http://127.0.0.1:8000/feedback', {
-        msg_id: testMsgId,
-        score: 1
-      });
+      // await axios.post('http://127.0.0.1:8000/feedback', {
+      //   msg_id: testMsgId,
+      //   score: 1
+      // });
+
+      await chatApi.sendFeedback(testMsgId, 1); // 使用封装好的 API 方法
+
+      // 🔍 【追踪点 2】: 前端收到成功反馈
+      console.log(`✅ [前端收到] 点赞成功，ID: ${testMsgId} 已存入数据库。`);
       alert("👍 点赞成功！已存入数据库");
     } catch (error) {
       console.error(error);
@@ -122,7 +135,7 @@ function App() {
           👍 测试点赞功能 (数据追踪 Demo)
         </button>
       </div>
-      
+
       {/* 聊天记录列表区域 */}
       <div className="message-list">
         {/* 【语法点：map】 把数据数组变成一堆 HTML 标签 */}
@@ -132,7 +145,7 @@ function App() {
             <div className="bubble">{msg.content}</div>
           </div>
         ))}
-        
+
         {/* 【语法点：条件渲染】 只有 loading 为 true 时才显示 */}
         {loading && <div className="loading">AI 正在思考中...</div>}
       </div>
@@ -140,16 +153,16 @@ function App() {
       {/* 底部输入区域 */}
       <div className="input-area">
         {/* ➕ 新增：隐藏的文件输入框 */}
-        <input 
-          type="file" 
+        <input
+          type="file"
           ref={fileInputRef}
           style={{ display: 'none' }} // 把它藏起来
           accept=".pdf" // 只允许传 PDF
           onChange={handleFileUpload}
         />
-        
+
         {/* ➕ 新增：上传按钮 (点击它触发上面的 input) */}
-        <button 
+        <button
           className="upload-btn"
           onClick={() => fileInputRef.current?.click()}
           disabled={loading}
@@ -158,7 +171,7 @@ function App() {
           📎
         </button>
 
-        <input 
+        <input
           type="text"
           value={input}
           // 当用户打字时，实时更新 input 状态
