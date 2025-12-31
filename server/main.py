@@ -3,11 +3,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from db import Base, engine
 
+# 👇 变化在这里：
+from database import engine
+import models # 👈 必须导入这个，不然 create_all 找不到表！
+
 # 引入路由模块
 from routers import upload, chat
 
 # 初始化数据库表
-Base.metadata.create_all(bind=engine)
+# Base.metadata.create_all(bind=engine)
+models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="企业知识库助手 Pro")
 
