@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'; // 引入“记忆”功能
+import { useState, useRef, useEffect } from 'react'; // 引入“记忆”功能
 // import axios from 'axios';        // 引入“打电话”功能
 import './App.less';              // 引入“装修图纸”
 import { chatApi } from './api';
@@ -157,6 +157,22 @@ function App() {
       alert("❌ 失败");
     }
   };
+
+  // ➕ 新增：组件挂载时，加载历史记录
+  useEffect(() => {
+    const loadHistory = async () => {
+      try {
+        const history = await chatApi.getHistory();
+        // 把数据库里的记录，直接塞给 UI 显示
+        setMessages(history);
+      } catch (e) {
+        console.error("加载历史记录失败:", e);
+        // 失败了也不用弹窗吓唬用户，默默失败即可
+      }
+    };
+
+    loadHistory();
+  }, []); // 👈 空数组的意思是：只在页面第一次加载时执行一次
 
   // --- 下面是界面画图 (TSX) ---
   return (

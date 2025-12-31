@@ -12,7 +12,7 @@ from rag_core import RAGService  # 引用刚才写的逻辑
 
 # ➕ 新增：引入数据库相关
 from sqlalchemy.orm import Session
-from db import get_db, ChatHistory , Feedback
+from db import get_db, ChatHistory , Feedback , SessionLocal
 
 # ➕ 新增 UploadFile 和 File，用来处理文件上传
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
@@ -130,9 +130,38 @@ async def chat(req: ChatRequest, db: Session = Depends(get_db)):
         # (下一轮我教你如何优雅地在流式结束时存数据库，先跑通流式再说)
         print(f"✅ AI 回答完毕: {full_response}")
 
+        # # 存 AI 的回答 (关键!)
+        # # 这里我们要手动开一个新的数据库会话，因为外面的 db 可能已经断开了
+        # with SessionLocal() as db_save:
+        #     ai_msg = ChatHistory(role="ai", content=full_response)
+        #     db_save.add(ai_msg)
+        #     db_save.commit()
+        #     print("💾 [数据库] AI 回答已保存")
+
+        ai_mesg = ChatHistory(role="ai", content=full_response)
+        db.add(ai_mesg)
+        db.commit()
+        print("💾 [数据库] AI 回答已保存")
+
     # 3. 返回流式响应
     return StreamingResponse(generate_response(), media_type="text/plain")
 
+# ➕ 新增：获取历史记录接口
+@app.get("/history")
+async def get_history(db: Session = Depends(get_db)):
+    # 1. 查询数据库
+    # order_by(desc): 按时间倒序查（最新的在前面）
+    # limit(20): 只拿最近 20 条
+    messages = db.query(ChatHistory)\
+        .order_by(ChatHistory.create_time.desc())\
+        .limit(20)\
+        .all()
+    
+    # 2. 因为查出来是倒序（新->旧），为了前端显示正常（旧->新），我们要反转一下
+    # [::-1] 是 Python 列表反转的黑魔法
+    history = [{"role": msg.role, "content": msg.content} for msg in messages][::-1]
+    
+    return history
 
 # 1. 定义接收的数据格式 (DTO)
 class FeedbackRequest(BaseModel):

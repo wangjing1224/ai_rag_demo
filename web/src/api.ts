@@ -65,5 +65,11 @@ export const chatApi = {
             score: score
         });
         return response.data;
-    }
+    },
+
+    // ➕ 新增：获取历史记录
+    getHistory: async () => {
+        const response = await apiClient.get('/history');
+        return response.data; // 记得我们的约定：管家帮忙拆快递
+    },
 };
