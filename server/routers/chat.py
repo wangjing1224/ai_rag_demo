@@ -4,7 +4,9 @@ from sqlalchemy.orm import Session
 from fastapi.responses import StreamingResponse
 
 # 引入我们拆分出去的模块
-from db import get_db, ChatHistory, Feedback ,SessionLocal # 假设没改名
+# from db import get_db, ChatHistory, Feedback ,SessionLocal # 假设没改名
+from database import SessionLocal, get_db
+from models import ChatHistory, Feedback
 from schemas import ChatRequest, FeedbackRequest
 from rag_core import rag_service
 

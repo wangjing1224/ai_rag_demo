@@ -6,6 +6,9 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_text_splitters import CharacterTextSplitter
 from langchain_core.documents import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter  # ➕ 新增：递归切分器
+from langchain_openai import OpenAIEmbeddings   # 👈 嵌入模型
+from langchain_openai import ChatOpenAI         # 👈 聊天模型
 
 # ➕ 新增：引入 PDF 加载器
 from langchain_community.document_loaders import PyPDFLoader
@@ -22,8 +25,33 @@ class RAGService:
             model="deepseek-chat",
             temperature=0.1
         )
-        self.embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-        self.vector_store = None
+        # 🔴 2. 修改这里：换回 HuggingFaceEmbeddings (本地运行，免费，稳定)
+        # self.embeddings = OpenAIEmbeddings(...) ❌ 删掉或注释这行
+        
+        print("正在加载本地嵌入模型 (首次运行可能需要下载)...")
+        self.embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2") 
+        # ✅ 使用这个！它会下载一个小模型到你电脑上，不用联网也能跑
+        self.vector_store_path = "faiss_index" # 💾 索引保存路径
+        self.vector_store = self._load_vector_store() # 🔄 启动时尝试加载
+        
+    # 🔄 内部方法：尝试从硬盘加载索引
+    def _load_vector_store(self):
+        if os.path.exists(self.vector_store_path):
+            try:
+                # allow_dangerous_deserialization=True 是为了加载本地 pickle 文件
+                vs = FAISS.load_local(self.vector_store_path, self.embeddings, allow_dangerous_deserialization=True)
+                print("✅ [RAG] 成功加载本地索引！")
+                return vs
+            except Exception as e:
+                print(f"⚠️ [RAG] 加载索引失败，将重建: {e}")
+                return None
+        return None
+
+    # 💾 内部方法：保存索引到硬盘
+    def _save_vector_store(self):
+        if self.vector_store:
+            self.vector_store.save_local(self.vector_store_path)
+            print("💾 [RAG] 索引已保存到本地")
     
     # 1. 保留原来的字符串初始化方法 (为了兼容)
     def init_from_text(self, text_content):
@@ -39,19 +67,68 @@ class RAGService:
         loader = PyPDFLoader(file_path)
         docs = loader.load() # 这里会把 PDF 每一页读出来
         
+        # # B. 切分 (把每一页再切碎点，方便检索)
+        # text_splitter = CharacterTextSplitter(chunk_size=300, chunk_overlap=50)
+        # split_docs = text_splitter.split_documents(docs)
+        
         # B. 切分 (把每一页再切碎点，方便检索)
-        text_splitter = CharacterTextSplitter(chunk_size=300, chunk_overlap=50)
-        split_docs = text_splitter.split_documents(docs)
-
+        splitter = RecursiveCharacterTextSplitter(chunk_size=300,chunk_overlap=50)
+        split_docs = splitter.split_documents(docs)
+        
+        # # C. 存入向量库
+        # if self.vector_store is None:
+        #     # 如果是第一次，就新建库
+        #     self.vector_store = FAISS.from_documents(split_docs, self.embeddings)
+        # else:
+        #     # 如果库里已经有东西了，就把新书“加”进去
+        #     self.vector_store.add_documents(split_docs)
+        
         # C. 存入向量库
-        if self.vector_store is None:
-            # 如果是第一次，就新建库
-            self.vector_store = FAISS.from_documents(split_docs, self.embeddings)
-        else:
+        if self.vector_store:
             # 如果库里已经有东西了，就把新书“加”进去
             self.vector_store.add_documents(split_docs)
+        else:
+            # 如果是第一次，就新建库
+            self.vector_store = FAISS.from_documents(split_docs, self.embeddings)
         
         print(f"✅ PDF '{file_path}' 已成功加入知识库！")
+
+    #🆕 新增：删除文件（通过重建索引的方式，这是最简单稳妥的方法）
+    def delete_file(self, filename):
+        # if not self.vector_store:
+        #     print("⚠️ 知识库为空，无需删除")
+        #     return
+        
+        # # 1. 获取所有文档
+        # all_docs = self.vector_store.documents
+        
+        # # 2. 过滤掉要删除的文件对应的文档
+        # remaining_docs = [doc for doc in all_docs if not doc.metadata.get("source", "").endswith(filename)]
+        
+        # # 3. 重建索引
+        # self.vector_store = FAISS.from_documents(remaining_docs, self.embeddings)
+        # print(f"✅ 文件 '{filename}' 已从知识库中删除！")
+        
+        # # 4. 保存更新后的索引
+        # self._save_vector_store()
+        
+        # 1. 简单粗暴方案：清空内存里的索引
+        self.vector_store = None
+        
+        # 2. 重新扫描 uploads 文件夹里的所有 PDF 重建
+        # (真实生产环境会用 delete by ID，但 FAISS 简单版不支持，重建最稳)
+        uploads_dir = "uploads"
+        if os.path.exists(uploads_dir):
+            files = [f for f in os.listdir(uploads_dir) if f.endswith(".pdf") and f != filename]
+            
+            # 如果还有其他文件，就重新把它们加进去
+            for f in files:
+                self.add_pdf(os.path.join(uploads_dir, f))
+                
+        # 如果删光了，记得把本地的索引文件也删了
+        if not self.vector_store and os.path.exists(self.vector_store_path):
+            import shutil
+            shutil.rmtree(self.vector_store_path)
     
     # 🔴 也就是把原来的 chat 方法改造成下面这样
     def chat_stream(self, question: str):

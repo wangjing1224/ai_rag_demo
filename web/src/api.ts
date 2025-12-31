@@ -72,4 +72,18 @@ export const chatApi = {
         const response = await apiClient.get('/history');
         return response.data; // 记得我们的约定：管家帮忙拆快递
     },
+
+
+    // ➕ 新增：删除文件
+    deleteFile: async (filename: string) => {
+        // 注意 URL 拼写
+        const response = await apiClient.delete(`/upload/${filename}`);
+        return response.data;
+    },
+
+    // ➕ 新增：获取文件列表
+    getFiles: async () => {
+        const response = await apiClient.get('/upload/list');
+        return response.data;
+    },
 };
