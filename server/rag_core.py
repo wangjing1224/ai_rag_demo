@@ -1,5 +1,6 @@
 # 文件位置: server/rag_core.py
 import os
+from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
@@ -8,6 +9,8 @@ from langchain_core.documents import Document
 
 # ➕ 新增：引入 PDF 加载器
 from langchain_community.document_loaders import PyPDFLoader
+
+load_dotenv()
 
 # 这里的逻辑和你之前的一模一样，只是封装成了类
 class RAGService:
@@ -49,18 +52,6 @@ class RAGService:
             self.vector_store.add_documents(split_docs)
         
         print(f"✅ PDF '{file_path}' 已成功加入知识库！")
-
-    # def chat(self, question: str):
-    #     if not self.vector_store:
-    #         return {"answer": "知识库为空，请先上传文件！", "context": ""}
-            
-    #     docs = self.vector_store.similarity_search(question, k=2)
-    #     context = "\n".join([d.page_content for d in docs])
-        
-    #     prompt = f"已知信息：\n{context}\n\n用户问题：{question}\n请根据已知信息回答。"
-    #     response = self.llm.invoke(prompt).content
-        
-    #     return {"answer": response, "context": context}
     
     # 🔴 也就是把原来的 chat 方法改造成下面这样
     def chat_stream(self, question: str):
@@ -81,3 +72,9 @@ class RAGService:
             if content:
                 # yield 就像是“挤牙膏”，挤一点出来给外面
                 yield content
+
+# 实例化一个全局对象供大家调用
+rag_service = RAGService(
+    api_key=os.getenv("DEEPSEEK_API_KEY"),
+    base_url=os.getenv("DEEPSEEK_BASE_URL")
+)

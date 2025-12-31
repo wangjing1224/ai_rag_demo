@@ -163,8 +163,13 @@ function App() {
     const loadHistory = async () => {
       try {
         const history = await chatApi.getHistory();
-        // 把数据库里的记录，直接塞给 UI 显示
-        setMessages(history);
+        if(Array.isArray(history.history)) {
+          // 把数据库里的记录，直接塞给 UI 显示
+          setMessages(history.history);
+        }
+        else {
+          console.error("历史记录格式错误:", history);
+        }
       } catch (e) {
         console.error("加载历史记录失败:", e);
         // 失败了也不用弹窗吓唬用户，默默失败即可
