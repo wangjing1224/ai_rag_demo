@@ -119,29 +119,33 @@ async def chat(req: ChatRequest, db: Session = Depends(get_db)):
     # 2. 定义一个生成器函数，负责一边挤牙膏，一边拼凑完整的答案（为了最后存数据库）
     def generate_response():
         full_response = ""
-        # 调用刚才写的 rag.chat_stream
-        for chunk in rag.chat_stream(user_q):
-            full_response += chunk
-            yield chunk # 把这个字推给前端
+        try:
+            # 调用刚才写的 rag.chat_stream
+            for chunk in rag.chat_stream(user_q):
+                full_response += chunk
+                yield chunk # 把这个字推给前端
         
-        # 3. 等全都流完了，把完整的答案存进数据库 (记账)
+        # 等全都流完了，把完整的答案存进数据库 (记账)
         # 注意：这里需要新建一个 Session，因为原来的 db 可能已经过期或被占用了
         # 为了简单，我们这里先省略存 AI 回答的步骤，或者用一种特殊技巧存
         # (下一轮我教你如何优雅地在流式结束时存数据库，先跑通流式再说)
-        print(f"✅ AI 回答完毕: {full_response}")
+        
+        finally:
+            print(f"✅ AI 回答完毕: {full_response}")
 
-        # # 存 AI 的回答 (关键!)
-        # # 这里我们要手动开一个新的数据库会话，因为外面的 db 可能已经断开了
-        # with SessionLocal() as db_save:
-        #     ai_msg = ChatHistory(role="ai", content=full_response)
-        #     db_save.add(ai_msg)
-        #     db_save.commit()
-        #     print("💾 [数据库] AI 回答已保存")
+            # # 存 AI 的回答 (关键!)
+            # # 这里我们要手动开一个新的数据库会话，因为外面的 db 可能已经断开了
+            with SessionLocal() as db_save:
+                ai_msg = ChatHistory(role="ai", content=full_response)
+                db_save.add(ai_msg)
+                db_save.commit()
+                print("💾 [数据库] AI 回答已保存")
 
-        ai_mesg = ChatHistory(role="ai", content=full_response)
-        db.add(ai_mesg)
-        db.commit()
-        print("💾 [数据库] AI 回答已保存")
+            # ai_mesg = ChatHistory(role="ai", content=full_response)
+            # db.add(ai_mesg)
+            # db.commit()
+            # print("💾 [数据库] AI 回答已保存")
+        
 
     # 3. 返回流式响应
     return StreamingResponse(generate_response(), media_type="text/plain")
@@ -153,7 +157,7 @@ async def get_history(db: Session = Depends(get_db)):
     # order_by(desc): 按时间倒序查（最新的在前面）
     # limit(20): 只拿最近 20 条
     messages = db.query(ChatHistory)\
-        .order_by(ChatHistory.create_time.desc())\
+        .order_by(ChatHistory.id.desc())\
         .limit(20)\
         .all()
     
