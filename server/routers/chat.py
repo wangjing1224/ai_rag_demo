@@ -16,6 +16,7 @@ router = APIRouter( tags=["聊天相关"])
 @router.post("/chat")
 async def chat(req: ChatRequest, db: Session = Depends(get_db)):
     user_q = req.question
+    user_model = req.model#获取前端传过来的模型名字
     
     # 1. 先存用户的问题 (记账)
     user_msg = ChatHistory(role="user", content=user_q)
@@ -27,7 +28,7 @@ async def chat(req: ChatRequest, db: Session = Depends(get_db)):
         full_response = ""
         try:
             # 调用刚才写的 rag.chat_stream
-            for chunk in rag_service.chat_stream(user_q):
+            for chunk in rag_service.chat_stream(user_q, model_name=user_model):
                 full_response += chunk
                 yield chunk # 把这个字推给前端
         

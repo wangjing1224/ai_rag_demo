@@ -17,22 +17,73 @@ load_dotenv()
 
 # 这里的逻辑和你之前的一模一样，只是封装成了类
 class RAGService:
-    def __init__(self, api_key, base_url):
-        # 1. 初始化模型
-        self.llm = ChatOpenAI(
-            api_key=api_key,
-            base_url=base_url,
-            model="deepseek-chat",
-            temperature=0.1
-        )
-        # 🔴 2. 修改这里：换回 HuggingFaceEmbeddings (本地运行，免费，稳定)
-        # self.embeddings = OpenAIEmbeddings(...) ❌ 删掉或注释这行
+    def __init__(self):
+        # # 1. 初始化模型
+        # self.llm = ChatOpenAI(
+        #     api_key=api_key,
+        #     base_url=base_url,
+        #     model="deepseek-chat",
+        #     temperature=0.1
+        # )
+        
+        # 1. 定义一个配置字典，把所有模型的“身份证”都登记在这里
+        # 这样以后想加新模型，只需要改这里，不用动业务逻辑
+        self.model_config = {
+            # === DeepSeek 系列 ===
+            "deepseek-chat": {
+                "api_key": os.getenv("DEEPSEEK_API_KEY"),
+                "base_url": os.getenv("DEEPSEEK_BASE_URL"),
+                "temperature": 0.3
+            },
+            "deepseek-reasoner": {
+                "api_key": os.getenv("DEEPSEEK_API_KEY"),
+                "base_url": os.getenv("DEEPSEEK_BASE_URL"),
+                "temperature": 0.1 # 推理模型通常低温
+            },
+            
+            # === 阿里云通义千文系列 ===
+            "qwen-plus": {
+                "api_key": os.getenv("QWEN_API_KEY"),
+                "base_url": os.getenv("QWEN_BASE_URL"),
+                "temperature": 0.5
+            },
+            "qwen-max": { # 通义千文最强版
+                "api_key": os.getenv("QWEN_API_KEY"),
+                "base_url": os.getenv("QWEN_BASE_URL"),
+                "temperature": 0.5
+            },
+
+            # === OpenAI 系列 ===
+            "gpt-4o": {
+                "api_key": os.getenv("OPENAI_API_KEY"),
+                "base_url": os.getenv("OPENAI_BASE_URL"),
+                "temperature": 0.7
+            }
+        }
+        
+        # 默认初始化一个模型 (防止启动报错)
+        self.current_llm = self._create_llm("deepseek-chat")   
         
         print("正在加载本地嵌入模型 (首次运行可能需要下载)...")
         self.embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2") 
         # ✅ 使用这个！它会下载一个小模型到你电脑上，不用联网也能跑
         self.vector_store_path = "faiss_index" # 💾 索引保存路径
         self.vector_store = self._load_vector_store() # 🔄 启动时尝试加载
+    
+    # 🛠️ 工厂方法：专门负责生产 LLM 对象
+    def _create_llm(self, model_name):
+        config = self.model_config.get(model_name)
+        if not config:
+            raise ValueError(f"⚠️ 模型 {model_name} 的 API Key 未配置，请检查 .env 文件")
+        
+        print(f"🔄 正在初始化模型: {model_name} (URL: {config['base_url']})")
+        
+        return ChatOpenAI(
+            api_key=config["api_key"],
+            base_url=config["base_url"],
+            model=model_name,
+            temperature=config.get("temperature", 0.3)
+        )
         
     # 🔄 内部方法：尝试从硬盘加载索引
     def _load_vector_store(self):
@@ -180,7 +231,7 @@ class RAGService:
             shutil.rmtree(self.vector_store_path)
     
     # 🔴 也就是把原来的 chat 方法改造成下面这样
-    def chat_stream(self, question: str):
+    def chat_stream(self, question: str , model_name: str="deepseek-chat"):
         if not self.vector_store:
             yield "知识库为空，请先上传文件！"
             return
@@ -188,19 +239,39 @@ class RAGService:
         # 1. 检索 (和以前一样)
         docs = self.vector_store.similarity_search(question, k=2)
         context = "\n".join([d.page_content for d in docs])
-        
         prompt = f"已知信息：\n{context}\n\n用户问题：{question}\n请根据已知信息回答。"
         
-        # 2. 调用 LLM (开启流式模式!)
-        # 注意：这里我们直接循环 llm.stream，而不是 invoke
-        for chunk in self.llm.stream(prompt):
-            content = chunk.content
-            if content:
-                # yield 就像是“挤牙膏”，挤一点出来给外面
-                yield content
+        # # 2. 调用 LLM (开启流式模式!)
+        # # 注意：这里我们直接循环 llm.stream，而不是 invoke
+        # for chunk in self.llm.stream(prompt):
+        #     content = chunk.content
+        #     if content:
+        #         # yield 就像是“挤牙膏”，挤一点出来给外面
+        #         yield content
+        
+        # 动态切换逻辑
+        # 如果前端传来的模型名，不在我们的配置表里，就用默认的 deepseek-chat
+        if model_name not in self.model_config:
+            yield f"⚠️ 模型 {model_name} 未配置，使用默认模型 deepseek-chat。"
+            model_name = "deepseek-chat"
+            
+        # 2. 动态创建模型
+        print(f"🔄 当前请求使用模型: {model_name}")
+        try:
+            target_llm = self._create_llm(model_name)
 
-# 实例化一个全局对象供大家调用
-rag_service = RAGService(
-    api_key=os.getenv("DEEPSEEK_API_KEY"),
-    base_url=os.getenv("DEEPSEEK_BASE_URL")
-)
+            for chunk in target_llm.stream(prompt):
+                content = chunk.content
+                if content:
+                    yield content
+        except Exception as e:
+            yield f"❌ 调用模型失败: {e}"
+
+# # 实例化一个全局对象供大家调用
+# rag_service = RAGService(
+#     api_key=os.getenv("DEEPSEEK_API_KEY"),
+#     base_url=os.getenv("DEEPSEEK_BASE_URL")
+# )
+
+# 🆕 重构：实例化
+rag_service = RAGService()

@@ -21,13 +21,13 @@ export const chatApi = {
 
     // ➕ 新增：流式对话
     // onMessage 是一个回调函数，每收到一个字，就调用它一次
-    chatStream: async (question: string, onMessage: (text: string) => void) => {
+    chatStream: async (question: string, model: string, onMessage: (text: string) => void) => {
         const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/chat`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ question }),
+            body: JSON.stringify({ question, model  }),
         });
 
         if (!response.body) return;

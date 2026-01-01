@@ -14,6 +14,9 @@ function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   
+  //模型选择状态
+  const [currentModel, setCurrentModel] = useState('deepseek-chat');
+
   // 🆕 新增：文件列表状态 (之前缺这个)
   const [files, setFiles] = useState<any[]>([]);
 
@@ -67,7 +70,7 @@ function App() {
     try {
       // 3. 流式请求
       let fullText = "";
-      await chatApi.chatStream(input, (chunk) => {
+      await chatApi.chatStream(input, currentModel, (chunk) => {
         fullText += chunk;
         setMessages(prev => {
           const newMessages = [...prev];
@@ -189,6 +192,20 @@ function App() {
 
         {/* 底部输入框 */}
         <div className="input-area">
+            {/* 新增模型选择下拉框 */}
+            <div style={{marginBottom:'0.5rem'}}>
+              <select
+                value={currentModel}
+                onChange={(e) => setCurrentModel(e.target.value)}
+                style={{ padding: '5px', borderRadius: '4px', border: '1px solid #ccc', marginRight: '10px' }}
+              >
+                <option value="deepseek-chat">DeepSeek Chat (默认)</option>
+                <option value="qwen-plus">通义千问PLUS (Qwen PLUS)</option>
+                <option value="gpt-3.5-turbo">OpenAI GPT-3.5 Turbo</option>
+              </select>
+            </div>
+
+
             {/* 文件上传 (隐形 Input) */}
             <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept=".pdf,.docx,.xlsx" onChange={handleFileUpload} />
             
