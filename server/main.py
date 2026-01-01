@@ -1,8 +1,6 @@
 # server/main.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from db import Base, engine
-
 # 👇 变化在这里：
 from database import engine
 import models # 👈 必须导入这个，不然 create_all 找不到表！
