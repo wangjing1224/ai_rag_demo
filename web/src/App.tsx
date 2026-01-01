@@ -155,7 +155,9 @@ function App() {
             <div key={index} className="file-item" style={{ 
               padding: '10px', background: 'rgba(255,255,255,0.05)', marginBottom: '8px', borderRadius: '6px', position: 'relative' 
             }}>
-              <div style={{ fontWeight: 'bold', paddingRight: '20px', color: 'white' }}>{file.name}</div>
+              <div style={{ fontWeight: 'bold', paddingRight: '20px', color: 'white' }}>
+                {file.name.endsWith('.pdf') ? '📄' : file.name.endsWith('.docx') ? '📝' : file.name.endsWith('.xlsx') ? '📊' : '📁'} {file.name}
+              </div>
               <div style={{ fontSize: '12px', color: '#999', marginTop: '5px' }}>
                 {file.size || '未知大小'}
               </div>

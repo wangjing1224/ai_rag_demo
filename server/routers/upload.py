@@ -65,9 +65,14 @@ async def list_files():
         return [] # ✅ 返回空数组，而不是 None 或 报错
     
     file_list = []
+    
+    #定义所有支持的文件类型后缀
+    supported_suffixes = [".pdf", ".docx", ".xlsx"]
+    
     # 遍历文件夹，组装详细信息
     for filename in os.listdir("uploads"):
-        if filename.endswith(".pdf"):
+        if filename.lower().endswith(tuple(supported_suffixes)):
+        # if filename.endswith(".pdf"):
             file_path = f"uploads/{filename}"
             
             # 1. 算大小
