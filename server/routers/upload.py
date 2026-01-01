@@ -21,10 +21,23 @@ async def upload_file(file: UploadFile = File(...)):
         
     # 3. 让 RAG 学习
     try:
-        print(f"📂 开始处理文件: {file.filename} ...")
-        rag_service.add_pdf(file_path)
-        print("✅ 处理完成")
-        return {"message": f"文件 {file.filename} 上传并处理成功！"}
+        # print(f"📂 开始处理文件: {file.filename} ...")
+        # rag_service.add_pdf(file_path)
+        # print("✅ 处理完成")
+        # return {"message": f"文件 {file.filename} 上传并处理成功！"}
+        
+        #根据文件名后缀决定如何处理
+        filename_lower = file.filename.lower()
+        
+        if filename_lower.endswith(".pdf"):
+            rag_service.add_pdf(file_path)
+        elif filename_lower.endswith(".docx"):
+            rag_service.add_word(file_path)
+        elif filename_lower.endswith(".xlsx"):
+            rag_service.add_excel(file_path)
+        else:
+            return{"status": "error", "message": "不支持的文件类型，仅支持 PDF、Word 和 Excel 文件"}
+        return {"status": "success", "message": f"文件 {file.filename} 上传并处理成功！"}
     except Exception as e:
         print(f"❌ 上传失败: {e}")
         traceback.print_exc()

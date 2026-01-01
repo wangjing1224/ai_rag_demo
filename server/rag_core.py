@@ -10,8 +10,8 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter  # ➕ 新�
 from langchain_openai import OpenAIEmbeddings   # 👈 嵌入模型
 from langchain_openai import ChatOpenAI         # 👈 聊天模型
 
-# ➕ 新增：引入 PDF 加载器
-from langchain_community.document_loaders import PyPDFLoader
+# ➕ 新增：引入 PDF,word,excel 加载器
+from langchain_community.document_loaders import PyPDFLoader,Docx2txtLoader,UnstructuredExcelLoader
 
 load_dotenv()
 
@@ -60,39 +60,88 @@ class RAGService:
         self.vector_store = FAISS.from_documents(docs, self.embeddings)
         print("✅ 文本知识库初始化完成")
 
-    # 2. ➕ 新增：从 PDF 文件初始化
-    def add_pdf(self, file_path):
-        print(f"正在读取文件: {file_path}")
-        # A. 加载 PDF
-        loader = PyPDFLoader(file_path)
-        docs = loader.load() # 这里会把 PDF 每一页读出来
+    # 🔄 [重构] 这是一个内部通用方法，不管什么文件，读出来后都走这套流程
+    def _proccess_and_save(self, docs,file_path):
+        print(f"✅ 成功加载 {len(docs)} 页 文档")
         
-        # # B. 切分 (把每一页再切碎点，方便检索)
-        # text_splitter = CharacterTextSplitter(chunk_size=300, chunk_overlap=50)
-        # split_docs = text_splitter.split_documents(docs)
-        
-        # B. 切分 (把每一页再切碎点，方便检索)
-        splitter = RecursiveCharacterTextSplitter(chunk_size=300,chunk_overlap=50)
+        # 统一使用配置好的切分器
+        splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
         split_docs = splitter.split_documents(docs)
+        print(f"✅ 切分成 {len(split_docs)} 知识片段")
         
-        # # C. 存入向量库
-        # if self.vector_store is None:
-        #     # 如果是第一次，就新建库
-        #     self.vector_store = FAISS.from_documents(split_docs, self.embeddings)
-        # else:
-        #     # 如果库里已经有东西了，就把新书“加”进去
-        #     self.vector_store.add_documents(split_docs)
-        
-        # C. 存入向量库
         if self.vector_store:
-            # 如果库里已经有东西了，就把新书“加”进去
             self.vector_store.add_documents(split_docs)
+            print("✅ 已经追加到现有知识库")
         else:
-            # 如果是第一次，就新建库
             self.vector_store = FAISS.from_documents(split_docs, self.embeddings)
+            print("✅ 初始化了新的知识库")  
+            
+        self._save_vector_store()
+        print(f"✅ 文件 '{os.path.basename(file_path)}' 已成功添加到知识库！") 
         
-        print(f"✅ PDF '{file_path}' 已成功加入知识库！")
-
+    # 2. 新增：添加 PDF 文件到知识库,调用上面的通用方法    
+    def add_pdf(self, file_path):
+        # try:
+        #     #加载 PDF 文件
+        #     loader = PyPDFLoader(file_path)
+        #     docs = loader.load()
+        #     print(f"✅ 成功加载 {len(docs)} 页 PDF")
+            
+        #     #切分文档
+        #     # 💡 知识点：chunk_size 越小，检索越精准，但丢失上下文；越大，上下文完整，但噪音多。
+        #     splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+        #     split_docs = splitter.split_documents(docs)
+        #     print(f"✅ 切分成 {len(split_docs)} 知识片段")
+            
+        #     #加入到向量库(内存中)
+        #     if self.vector_store:
+        #         self.vector_store.add_documents(split_docs)
+        #         print("✅ 已经追加到现有知识库")
+        #     else:
+        #         self.vector_store = FAISS.from_documents(split_docs, self.embeddings)
+        #         print("✅ 初始化了新的知识库")
+                
+        #     #保存到本地
+        #     self._save_vector_store()
+        #     print(f"✅ 文件 '{os.path.basename(file_path)}' 已成功添加到知识库！")
+        # except Exception as e:
+        #     print(f"❌ 添加文件失败: {e}")
+        #     raise e # 抛出异常以便上层处理    
+        print(f"正在处理 PDF 文件: {file_path}")
+        try:
+            # 加载 PDF 文件
+            loader = PyPDFLoader(file_path)
+            docs = loader.load()
+            self._proccess_and_save(docs,file_path)
+        except Exception as e:
+            print(f"❌ 添加文件失败: {e}")
+            raise e  # 抛出异常以便上层处理
+         
+    # ➕ 新增：添加 Word 文件到知识库,调用上面的通用方法
+    def add_word(self, file_path):
+        print(f"正在处理 Word 文件: {file_path}")
+        try:
+            # 加载 Word 文件
+            loader = Docx2txtLoader(file_path)
+            docs = loader.load()
+            self._proccess_and_save(docs,file_path)
+        except Exception as e:
+            print(f"❌ 添加文件失败: {e}")
+            raise e  # 抛出异常以便上层处理
+    
+    # ➕ 新增：添加 Excel 文件到知识库,调用上面的通用方法
+    def add_excel(self, file_path):
+        print(f"正在处理 Excel 文件: {file_path}")
+        try:
+            # 加载 Excel 文件
+            #mode="elements" 按行加载，更适合表格
+            loader = UnstructuredExcelLoader(file_path,mode="elements")
+            docs = loader.load()
+            self._proccess_and_save(docs,file_path)
+        except Exception as e:
+            print(f"❌ 添加文件失败: {e}")
+            raise e  # 抛出异常以便上层处理
+              
     #🆕 新增：删除文件（通过重建索引的方式，这是最简单稳妥的方法）
     def delete_file(self, filename):
         # if not self.vector_store:

@@ -188,7 +188,7 @@ function App() {
         {/* 底部输入框 */}
         <div className="input-area">
             {/* 文件上传 (隐形 Input) */}
-            <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept=".pdf" onChange={handleFileUpload} />
+            <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept=".pdf,.docx,.xlsx" onChange={handleFileUpload} />
             
             {/* 上传按钮 */}
             <button className="upload-btn" onClick={() => fileInputRef.current?.click()} disabled={loading} style={{ background: 'transparent', color: '#666', fontSize: '20px', padding: '0 10px' }}>
